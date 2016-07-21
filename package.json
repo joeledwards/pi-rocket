@@ -1,0 +1,28 @@
+{
+  "name": "pi-rocket",
+  "version": "1.0.0",
+  "description": "Model rocket launch control software for Raspberry Pi",
+  "scripts": {
+    "test": "node launch.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/joeledwards/pi-rocket.git"
+  },
+  "keywords": [
+    "model",
+    "rocket",
+    "launch",
+    "raspberry",
+    "pi"
+  ],
+  "author": "Joel Edwards <joeledwards@gmail.com>",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/joeledwards/pi-rocket/issues"
+  },
+  "homepage": "https://github.com/joeledwards/pi-rocket#readme",
+  "dependencies": {
+    "rpi-gpio": "^0.7.0"
+  }
+}
