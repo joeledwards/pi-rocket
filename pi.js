@@ -119,6 +119,15 @@ function set(pin, direction) {
   }
 }
 
+// Sleep (non-blocking) for the specified duration.
+function sleep(duration) {
+  const d = Q.defer();
+
+  setTimeout(() => d.resolve(), duration);
+
+  return d.promise;
+}
+
 // Set a GPIO pin to ON voltage.
 function on(pin) {
   return set(pin, ON);
@@ -160,6 +169,7 @@ module.exports = {
   off: off,
   on: on,
   pulse: pulse,
-  shutdown: shutdown
+  shutdown: shutdown,
+  sleep: sleep,
 };
 
