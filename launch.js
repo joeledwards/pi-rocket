@@ -149,7 +149,7 @@ app.post('/cancel-count-down', (req, res) => {
   } else if (running) {
     running = false;
     console.log(`Countdown cancelled with ${runRemaining()} remaining.`);
-    runWatch.stop();
+    runWatch.reset();
     res.status(200).json({status: 'countdown-cancelled'});
   } else {
     console.log('System inactive.');
