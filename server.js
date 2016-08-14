@@ -2,7 +2,7 @@
 
 const _ = require('lodash');
 const Q = require('q');
-const app = require('express')();
+const express = require('express');
 const durations = require('durations');
 
 const pi = require('./pi');
@@ -19,12 +19,21 @@ let runDuration = 10000;
 let burnDuration = 5000;
 
 function runRemaining() {
-  return durations.duration(runDuration * 1000000 - runWatch.duration().nanos());
+  return durations.duration(
+    runDuration * 1000000 - runWatch.duration().nanos()
+  );
 }
 
 function burnRemaining() {
-  return durations.duration(burnDuration * 1000000 - burnWatch.duration().nanos());
+  return durations.duration(
+    burnDuration * 1000000 - burnWatch.duration().nanos()
+  );
 }
+
+const app = express();
+
+// Serve up the control website
+app.use('/control', express.static('public'));
 
 // Switch relay on
 app.post('/on', (req, res) => {
@@ -158,14 +167,4 @@ app.post('/cancel-count-down', (req, res) => {
 });
 
 app.listen(bindPort, console.log(`Listening on port ${bindPort}`));
-
-/*
-pi.on(32)
-.then(() => pi.sleep(1000))
-.then(() => pi.off(32))
-.then(() => process.exit(0))
-.catch((error) => {
-  console.error('Error:', error);
-}); 
-*/
 
