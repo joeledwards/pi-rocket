@@ -18,7 +18,7 @@ function publish(channel, message) {
 }
 
 // Serve up the control website
-app.use('/control', express.static('public'));
+app.use('/control', express.static('../public'));
 
 // Switch relay on
 app.post('/on', (req, res) => {
