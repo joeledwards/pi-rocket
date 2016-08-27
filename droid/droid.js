@@ -4,7 +4,7 @@ const express = require('express');
 const bindPort = 8080;
 const app = express();
 
-const pubnubConfig = fs.readFileSync('./pubnub.json');
+const pubnubConfig = JSON.parse(fs.readFileSync('../pubnub.json'));
 const nub = pubnub(pubnubConfig);
 
 // Publish a message to the control bus

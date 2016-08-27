@@ -34,7 +34,7 @@ function burnRemaining() {
 
 const app = express();
 
-const pubnubConfig = fs.readFileSync('./pubnub.json');
+const pubnubConfig = JSON.parse(fs.readFileSync('./pubnub.json'));
 const nub = pubnub(pubnubConfig);
 
 function relayOn() {
