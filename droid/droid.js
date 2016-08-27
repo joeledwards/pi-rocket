@@ -5,7 +5,7 @@ const express = require('express');
 const bindPort = 8080;
 const app = express();
 
-let {pubKey, subKey, secret} = JSON.parse(fs.readFileSync('./pubnub.json'));
+let {pubKey, subKey, secret} = JSON.parse(fs.readFileSync('../pubnub.json'));
 const pubnubConfig = {
   ssl: true,
   publish_key: pubKey,
