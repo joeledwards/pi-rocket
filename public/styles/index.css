@@ -1,0 +1,10 @@
+button#launch-button {
+  background-color: red;
+  color: black;
+  width: 10em;
+  height: 10em;
+  border-radius: 5em;
+  font-weight: bold;
+  font-size: 16pt;
+  outline: none;
+}

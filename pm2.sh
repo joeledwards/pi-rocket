@@ -12,4 +12,4 @@ ERROR_LOG=$LOG_DIR/error.log
 PID_FILE=$DATA_DIR/$APP_NAME.pid
 
 pm2 delete $APP_NAME
-pm2 start $APP_DIR/launch.js --name $APP_NAME -o $INFO_LOG -e $ERROR_LOG -p $PID_FILE
+pm2 start $APP_DIR/server.js --name $APP_NAME -o $INFO_LOG -e $ERROR_LOG -p $PID_FILE

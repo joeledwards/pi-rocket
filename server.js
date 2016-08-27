@@ -2,6 +2,8 @@
 
 const _ = require('lodash');
 const Q = require('q');
+const P = require('bluebird');
+const pubnub = require('pubnub');
 const express = require('express');
 const durations = require('durations');
 
@@ -32,51 +34,120 @@ function burnRemaining() {
 
 const app = express();
 
+const pubnubConfig = fs.readFileSync('./pubnub.json');
+const nub = pubnub(pubnubConfig);
+
+function relayOn() {
+  return new P((resolve, reject) => {
+    if (burning) {
+      console.log('Ignition already active.');
+      resolve({
+        code: 200,
+        response: {status: 'ignition-active'},
+      });
+    } else {
+      console.log('Activating ignition.');
+      burning = true;
+      burnWatch.reset().start();
+
+      pi.on(32)
+      .then(() => {
+        console.log('Ignition active.');
+        resolve({
+          code: 200,
+          response: {status: 'ignition-active'},
+        });
+      })
+      .catch((error) => {
+        logger.error('Error:', error)
+        resolve({
+          code: 500,
+          response: {status: 'error'},
+        });
+      });
+    }
+  });
+}
+
+function relayOff() {
+  return new P((resolve, reject) => {
+    if (burning) {
+      console.log('Deactivating ignition.');
+      burning = false;
+      burnWatch.reset();
+
+      pi.off(32)
+      .then(() => {
+        console.log('Ignition deactivated.');
+        resolve({
+          code: 200,
+          response: {status: 'inactive'},
+        });
+      })
+      .catch((error) => {
+        logger.error('Error:', error)
+        resolve({
+          code: 500,
+          response: {status: 'error'},
+        });
+      });
+    } else {
+      console.log('Ignition already inactive');
+      resolve({
+        code: 200,
+        response: {status: 'inactive'},
+      });
+    }
+  });
+}
+
+function relayStatus() {
+}
+
+function relayCountDown() {
+}
+
+function relayCancelCountDown() {
+}
+
+// Publish a message to the control bus
+function publish(channel, message) {
+  nub.publish({
+    channel: channel,
+    message: message,
+    callback: result => console.log('Message published:', result),
+    error: error => console.error('Error publishing message:', error),
+  });
+}
+
+// Control via PubNub
+nub.subscribe({
+  channel: 'pi-rocket-control',
+  message: json => {
+    let {command} =  JSON.parse(json);
+    if (command === 'relay-on') { 
+      relayOn()
+      .then(r => publish('pi-rocket-notifications', JSON.stringify(r)));
+    } else if (command === 'relay-off') {
+      relayOff()
+      .then(r => publish('pi-rocket-notifications', JSON.stringify(r)));
+    } else {
+      console.error(`Unrecognized command '${command}'`);
+    }
+  },
+});
+
 // Serve up the control website
 app.use('/control', express.static('public'));
 
 // Switch relay on
 app.post('/on', (req, res) => {
-  if (burning) {
-    console.log('Ignition already active.');
-    res.status(200).json({status: 'ignition-active'});
-  } else {
-    console.log('Activating ignition.');
-    burning = true;
-    burnWatch.reset().start();
-
-    pi.on(32)
-    .then(() => {
-      console.log('Ignition active.');
-      res.status(200).json({status: 'ignition-active'});
-    })
-    .catch((error) => {
-      logger.error('Error:', error)
-      res.status(500).json({status: 'error'});
-    });
-  }
+  relayOn().then(r => res.status(r.code).json(r.response));
 });
 
 // Switch relay off
 app.post('/off', (req, res) => {
-  if (burning) {
-    console.log('Deactivating ignition.');
-    burning = false;
-    burnWatch.reset();
-
-    pi.off(32)
-    .then(() => {
-      console.log('Ignition deactivated.');
-      res.status(200).json({status: 'inactive'});
-    })
-    .catch((error) => {
-      logger.error('Error:', error)
-      res.status(500).json({status: 'error'});
-    });
-  } else {
-    console.log('Ignition already inactive');
-      res.status(200).json({status: 'inactive'});
-  }
+  relayOff().then(r => res.status(r.code).json(r.response));
 });
 
 // Countdown to launch
