@@ -23,6 +23,31 @@ function publish(channel, message) {
   });
 }
 
+// Control echo
+nub.subscribe({
+  channel: 'pi-rocket-control',
+  message: json => console.log('Control message:', json),
+});
+
+// Notifications from PubNub
+nub.subscribe({
+  channel: 'pi-rocket-notifications',
+  message: json => {
+    console.log('Notification:', json);
+
+    let {command} =  JSON.parse(json);
+    if (command === 'relay-on') { 
+      relayOn()
+      .then(r => publish('pi-rocket-notifications', JSON.stringify(r)));
+    } else if (command === 'relay-off') {
+      relayOff()
+      .then(r => publish('pi-rocket-notifications', JSON.stringify(r)));
+    } else {
+      console.error(`Unrecognized command '${command}'`);
+    }
+  },
+});
+
 // Serve up the control website
 app.use('/control', express.static('../public'));
 
