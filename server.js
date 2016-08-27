@@ -35,7 +35,12 @@ function burnRemaining() {
 
 const app = express();
 
-const pubnubConfig = JSON.parse(fs.readFileSync('./pubnub.json'));
+let {pubKey, subKey, secret} = JSON.parse(fs.readFileSync('./pubnub.json'));
+const pubnubConfig = {
+  ssl: true,
+  publish_key: pubKey,
+  subscribe_key: subKey,
+};
 const nub = pubnub(pubnubConfig);
 
 function relayOn() {
