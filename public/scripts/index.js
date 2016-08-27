@@ -41,5 +41,6 @@ const launch = () => {
 // Set up jQuery bindings
 $(document).ready(() => {
   $('#launch-button').bind('click', launch);
+  $('#clear-button').bind('click', ignitionOff);
 });
 
