@@ -1,3 +1,4 @@
+const fs = require('fs');
 const pubnub = require('pubnub');
 const express = require('express');
 
