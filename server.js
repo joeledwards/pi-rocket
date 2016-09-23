@@ -232,7 +232,7 @@ function relayCancelCountDown() {
 
 const app = express();
 
-cogs.getClient('./cogswell.json')
+cogs.client.getClient('./cogswell.json')
 .then(client => {
   // Publish a message to the control bus
   function publish(channel, message) {
