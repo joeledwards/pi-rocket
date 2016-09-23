@@ -1,5 +1,5 @@
 const _ = require('lodash');
-const Q = require('q');
+const P = require('bluebird');
 const gpio = require('rpi-gpio');
 
 /* List of pins
@@ -44,66 +44,23 @@ const pinMap = {};
 
 // Setup the GPIO pin.
 function setup(pin, ioDirection, edge) {
-  var d = Q.defer();
-
-  try {
-    gpio.setup(pin, ioDirection, edge, (error) => {
-      if (error) {
-        d.reject(error);
-      } else {
-        d.resolve();
-      }
-    });
-  } catch (err) {
-    d.reject(err);
-  }
-
-  return d.promise;
+  return P.promisify(gpio.setup)(pin, ioDirection, edge);
 }
 
 // Read from the specified GPIO pin.
 function read(pin) {
-  var d = Q.defer();
-
-  try {
-    gpio.input(pin, (error, value) => {
-      if (error) {
-        d.reject(error);
-      } else {
-        d.resolve(value);
-      }
-    });
-  } catch (err) {
-    d.reject(err);
-  }
-
-  return d.promise;
+  return P.promisify(gpio.input)(pin);
 }
 
 // Write to the specified GPIO pin.
 function write(pin, direction) {
-  var d = Q.defer();
-
-  try {
-    gpio.output(pin, direction, (error) => {
-      if (error) {
-        d.reject(error);
-      } else {
-        d.resolve();
-      }
-    });
-  } catch (err) {
-    d.reject(err);
-  }
-
-  return d.promise;
+  return P.promisify(gpio.output)(pin, direction);
 }
 
 // Get the current value of the specified GPIO pin.
 function get(pin) {
   if (pinMap[pin] !== "read") {
-    return setup(pin, GPIO_READ, READ_EDGE)
-        .then(() => read(pin));
+    return setup(pin, GPIO_READ, READ_EDGE).then(() => read(pin));
   } else {
     return read(pin);
   }
@@ -112,20 +69,10 @@ function get(pin) {
 // Set the current value of the specified GPIO pin.
 function set(pin, direction) {
   if (pinMap[pin] !== "write") {
-    return setup(pin, GPIO_WRITE, WRITE_EDGE)
-        .then(() => write(pin, direction));
+    return setup(pin, GPIO_WRITE, WRITE_EDGE).then(() => write(pin, direction));
   } else {
     return write(pin, direction);
   }
-}
-
-// Sleep (non-blocking) for the specified duration.
-function sleep(duration) {
-  const d = Q.defer();
-
-  setTimeout(() => d.resolve(), duration);
-
-  return d.promise;
 }
 
 // Set a GPIO pin to ON voltage.
@@ -140,28 +87,22 @@ function off(pin) {
 
 // Pulse the pin to ON voltage for duration.
 function pulse(pin, duration) {
-  var d = Q.defer();
-
-  on(pin)
-  .then(() => {
-    setTimeout(() => {
-      off(pin)
-      .then(() => d.resolve())
-      .catch((error) => d.reject(error));
-    }, duration);
-  })
-  .catch((error) => d.reject(error));
-
-  return d.promise;
+  return new P((resolve, reject) => {
+    on(pin)
+    .then(() => {
+      setTimeout(() => {
+        off(pin)
+        .then(() => resolve())
+        .catch((error) => reject(error));
+      }, duration);
+    })
+    .catch((error) => reject(error));
+  });
 }
 
 // Shutdown the GPIO lib.
 function shutdown() {
-  var d = Q.defer();
-
-  gpio.destroy(() => d.resolve());
-
-  return d.promise;
+  return new P(resolve => gpio.destroy(() => resolve()));
 }
 
 module.exports = {
@@ -170,6 +111,5 @@ module.exports = {
   on: on,
   pulse: pulse,
   shutdown: shutdown,
-  sleep: sleep,
 };
 

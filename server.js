@@ -1,10 +1,9 @@
-//require('log-a-log');
+require('log-a-log');
 
 const _ = require('lodash');
-const Q = require('q');
 const P = require('bluebird');
 const fs = require('fs');
-const pubnub = require('pubnub');
+const cogs = require('cogs-sdk');
 const express = require('express');
 const durations = require('durations');
 
@@ -12,18 +11,32 @@ const pi = require('./pi');
 
 const bindPort = 8080;
 
-const runWatch = durations.stopwatch();
+const countDownWatch = durations.stopwatch();
 const burnWatch = durations.stopwatch();
 
-let running = false;
+let countingDown = false;
 let burning = false;
 
-let runDuration = 10000;
+let countDownDuration = 10000;
 let burnDuration = 5000;
+let noPi = true;
 
-function runRemaining() {
+function pinOn(pin) {
+  return noPi ? P.resolve() : pi.on(pin);
+}
+
+function pinOff(pin) {
+  return noPi ? P.resolve() : pi.off(pin);
+}
+
+// Sleep (non-blocking) for the specified duration.
+function sleep(duration) {
+  return new P(resolve => setTimeout(() => resolve(), duration));
+}
+
+function countDownRemaining() {
   return durations.duration(
-    runDuration * 1000000 - runWatch.duration().nanos()
+    countDownDuration * 1000000 - countDownWatch.duration().nanos()
   );
 }
 
@@ -32,16 +45,6 @@ function burnRemaining() {
     burnDuration * 1000000 - burnWatch.duration().nanos()
   );
 }
-
-const app = express();
-
-let {pubKey, subKey, secret} = JSON.parse(fs.readFileSync('./pubnub.json'));
-const pubnubConfig = {
-  ssl: true,
-  publish_key: pubKey,
-  subscribe_key: subKey,
-};
-const nub = pubnub(pubnubConfig);
 
 function relayOn() {
   return new P((resolve, reject) => {
@@ -56,7 +59,7 @@ function relayOn() {
       burning = true;
       burnWatch.reset().start();
 
-      pi.on(32)
+      pinOn(32)
       .then(() => {
         console.log('Ignition active.');
         resolve({
@@ -82,7 +85,7 @@ function relayOff() {
       burning = false;
       burnWatch.reset();
 
-      pi.off(32)
+      pinOff(32)
       .then(() => {
         console.log('Ignition deactivated.');
         resolve({
@@ -108,140 +111,215 @@ function relayOff() {
 }
 
 function relayStatus() {
-}
+  return new P((resolve, reject) => {
+    if (burning) {
+      console.log(`Ignition is active, remaining duration is ${countDownRemaining()}.`);
 
-function relayCountDown() {
-}
+      resolve({
+        code: 200,
+        response: {
+          status: 'ignition-active',
+          remaining: burnRemaining().millis(),
+        },
+      });
+    } else if (countingDown) {
+      console.log(`Countdown is active, remaining duration is ${burnRemaining()}.`);
 
-function relayCancelCountDown() {
-}
+      resolve({
+        code: 200,
+        response: {
+          status: 'counting-down',
+          remaining: countDownRemaining().millis(),
+        },
+      });
+    } else {
+      console.log(`System inactive.`);
 
-// Publish a message to the control bus
-function publish(channel, message) {
-  nub.publish({
-    channel: channel,
-    message: message,
-    callback: result => console.log('Message published:', result),
-    error: error => console.error('Error publishing message:', error),
+      resolve({
+        code: 200,
+        response: {status: 'inactive'},
+      });
+    }
   });
 }
 
-// Control via PubNub
-nub.subscribe({
-  channel: 'pi-rocket-control',
-  message: json => {
-    let {command} =  JSON.parse(json);
-    if (command === 'relay-on') { 
-      relayOn()
-      .then(r => publish('pi-rocket-notifications', JSON.stringify(r)));
-    } else if (command === 'relay-off') {
-      relayOff()
-      .then(r => publish('pi-rocket-notifications', JSON.stringify(r)));
+function relayCountDown() {
+  return new P((resolve, reject) => {
+    if (burning) {
+      console.log(`Ignition active, ${burnRemaining()} remaining.`);
+
+      resolve({
+        code: 200,
+        response: {
+          status: 'ignition-active',
+          remaining: burnRemaining().millis(),
+        },
+      });
     } else {
-      console.error(`Unrecognized command '${command}'`);
+      if (countingDown) {
+        console.log(`Countdown is already running, ${countDownRemaining()} remaining.`);
+      } else {
+        countingDown = true;
+        countDownWatch.reset().start();
+        console.log(`Starting countdown, ${countDownRemaining()} remaining.`);
+
+        sleep(countDownDuration)
+        .then(() => {
+          if (countingDown) {
+            countingDown = false;
+            burning = true;
+            countDownWatch.reset();
+            burnWatch.reset().start();
+            console.log(`Ignition on, ${countDownRemaining()} remaining.`);
+
+            return pinOn(32)
+            .then(() => sleep(5000))
+            .then(() => {
+              burning = false;
+              burnWatch.reset();
+              console.log(`Ignition off.`);
+              pinOff(32)
+            });
+          } else {
+            console.log('Ignition cancelled.');
+          }
+        })
+        .catch((error) => console.error('Error during launch:', error));
+      }
+
+      resolve({
+        code: 200,
+        response: {
+          status: 'counting-down',
+          remaining: countDownRemaining().millis(),
+        },
+      });
     }
-  },
-});
+  });
+}
 
-// Serve up the control website
-app.use('/control', express.static('public'));
+function relayCancelCountDown() {
+  return new P((resolve, reject) => {
+    if (burning) {
+      console.log(`Burn active, ${burnRemaining()} remaining.`);
 
-// Switch relay on
-app.post('/on', (req, res) => {
-  relayOn().then(r => res.status(r.code).json(r.response));
-});
+      resolve({
+        code: 200,
+        response: {
+          status: 'ignition-active',
+          remaining: burnRemaining().millis(),
+        },
+      });
+    } else if (countingDown) {
+      countingDown = false;
+      console.log(`Countdown cancelled with ${countDownRemaining()} remaining.`);
+      countDownWatch.reset();
 
-// Switch relay off
-app.post('/off', (req, res) => {
-  relayOff().then(r => res.status(r.code).json(r.response));
-});
-
-// Countdown to launch
-app.post('/count-down', (req, res) => {
-  if (burning) {
-    console.log(`Ignition active, ${burnRemaining()} remaining.`);
-
-    res.status(200).json({
-      status: 'ignition-active',
-      remaining: burnRemaining(),
-    });
-  } else {
-    if (running) {
-      console.log(`Countdown is already running, ${runRemaining()} remaining.`);
+      resolve({
+        code: 200,
+        response: {status: 'countdown-cancelled'},
+      });
     } else {
-      running = true;
-      runWatch.reset().start();
-      console.log(`Starting countdown, ${runRemaining()} remaining.`);
+      console.log('System inactive.');
 
-      pi.sleep(runDuration)
-      .then(() => {
-        if (running) {
-          running = false;
-          burning = true;
-          runWatch.reset();
-          burnWatch.reset().start();
-          console.log(`Ignition on, ${runRemaining()} remaining.`);
-
-          return pi.on(32)
-          .then(() => pi.sleep(5000))
-          .then(() => {
-            burning = false;
-            burnWatch.reset();
-            console.log(`Ignition off.`);
-            pi.off(32)
-          });
-        } else {
-          console.log('Ignition cancelled.');
-        }
-      })
-      .catch((error) => console.error('Error during launch:', error));
+      resolve({
+        code: 200,
+        response: {status: 'inactive'},
+      });
     }
+  });
+}
 
-    res.status(200).json({
-      status: 'counting-down',
-      remaining: runRemaining().millis(),
-    });
+const app = express();
+
+cogs.getClient('./cogswell.json')
+.then(client => {
+  // Publish a message to the control bus
+  function publish(channel, message) {
+    return cogsClient.sendEvent('directive', 'pi-rocket', {'channel': channel, 'command': command})
+    .then(({event_id: eventId}) => console.log(`Published event '${eventId}' to Cogs.`))
+    .catch(error => console.error(`Error sending event to Cogs:`, error));
   }
-});
 
-// Poll count down duration
-app.get('/status', (req, res) => {
-  if (burning) {
-    console.log(`Ignition is active, remaining duration is ${runRemaining()}.`);
-    res.status(200).json({
-      status: 'ignition-active',
-      remaining: burnRemaining().millis(),
-    });
-  } else if (running) {
-    console.log(`Countdown is active, remaining duration is ${burnRemaining()}.`);
-    res.status(200).json({
-      status: 'counting-down',
-      remaining: runRemaining().millis(),
-    });
-  } else {
-    console.log(`System inactive.`);
-    res.status(200).json({status: 'inactive'});
-  }
-});
+  const ws = client.subscribe('pi-rocket', {'channel': 'pi-rocket-control'});
 
-// Cancel countdown
-app.post('/cancel-count-down', (req, res) => {
-  if (burning) {
-    console.log(`Burn active, ${burnRemaining()} remaining.`);
-    res.status(200).json({
-      status: 'ignition-active',
-      remaining: burnRemaining().millis(),
-    });
-  } else if (running) {
-    running = false;
-    console.log(`Countdown cancelled with ${runRemaining()} remaining.`);
-    runWatch.reset();
-    res.status(200).json({status: 'countdown-cancelled'});
-  } else {
-    console.log('System inactive.');
-    res.status(200).json({status: 'inactive'});
-  }
-});
+  ws.on('connectFailed', (error) => console.error("Error subscribing to channel:", error));
+  ws.on('error', error => console.error('Error on control channel:', error));
+  ws.on('open', () => console.log('Connected to control channel.'));
+  ws.on('reconnect', () => console.log('Reconnected to control channel.'));
+  ws.on('close', () => console.error('Control channel closed.'));
+  ws.on('ack', messageId => console.error(`Message ${messageId} acknowledged.`));
 
-app.listen(bindPort, console.log(`Listening on port ${bindPort}`));
+  ws.on('message', message => {
+    let {data: {command}, message_id: messageId} = JSON.parse(message);
+
+    // Control via Cogswell
+    switch (command) {
+      case 'relay-on': 
+        relayOn().then(
+          r => publish('pi-rocket-notifications', JSON.stringify(r))
+        );
+        
+        break;
+      case 'relay-off': 
+        relayOff().then(
+          r => publish('pi-rocket-notifications', JSON.stringify(r))
+        );
+
+        break;
+      case 'status':
+        relayStatus().then(
+          r => publish('pi-rocket-notifications', JSON.stringify(r))
+        );
+
+        break;
+      case 'count-down':
+        relayCountDown().then(
+          r => publish('pi-rocket-notifications', JSON.stringify(r))
+        );
+
+        break;
+      case 'cancel-count-down':
+        relayCancelCountDown().then(
+          r => publish('pi-rocket-notifications', JSON.stringify(r))
+        );
+
+        break;
+      default:
+        console.error(`Unrecognized command '${command}'`);
+
+        break;
+    }
+  });
+
+  // Serve up the control website
+  app.use('/control', express.static('public'));
+
+  // Switch relay on
+  app.post('/on', (req, res) => {
+    relayOn().then(r => res.status(r.code).json(r.response));
+  });
+
+  // Switch relay off
+  app.post('/off', (req, res) => {
+    relayOff().then(r => res.status(r.code).json(r.response));
+  });
+
+  // Poll count down duration
+  app.get('/status', (req, res) => {
+    relayStatus().then(r => res.status(r.code).json(r.response));
+  });
+
+  // Countdown to launch
+  app.post('/count-down', (req, res) => {
+    relayCountDown().then(r => res.status(r.code).json(r.response));
+  });
+
+  // Cancel countdown
+  app.post('/cancel-count-down', (req, res) => {
+    relayCancelCountDown().then(r => res.status(r.code).json(r.response));
+  });
+
+  app.listen(bindPort, console.log(`Listening on port ${bindPort}`));
+});
 
