@@ -44,23 +44,37 @@ const pinMap = {};
 
 // Setup the GPIO pin.
 function setup(pin, ioDirection, edge) {
-  return P.promisify(gpio.setup)(pin, ioDirection, edge);
+  return new P((resolve, reject) => {
+    gpio.setup(pin, ioDirection, edge, (error) => {
+      if (error) {
+        console.error(`Error setting pin ${pin} to direction ${ioDirection}:`, error);
+        reject(error);
+      } else {
+        console.log(`Set pin ${pin} to direction ${ioDirection}:`);
+        resolve();
+      }
+    });
+  });
 }
 
 // Read from the specified GPIO pin.
 function read(pin) {
-  return P.promisify(gpio.input)(pin);
+  return P.promisify(gpio.read)(pin);
 }
 
 // Write to the specified GPIO pin.
 function write(pin, direction) {
-  return P.promisify(gpio.output)(pin, direction);
+  return P.promisify(gpio.write)(pin, direction);
 }
 
 // Get the current value of the specified GPIO pin.
 function get(pin) {
   if (pinMap[pin] !== "read") {
-    return setup(pin, GPIO_READ, READ_EDGE).then(() => read(pin));
+    return setup(pin, GPIO_READ, READ_EDGE)
+    .then(() => {
+      pinMap[pin] = "read";
+      return read(pin);
+    });
   } else {
     return read(pin);
   }
@@ -69,7 +83,11 @@ function get(pin) {
 // Set the current value of the specified GPIO pin.
 function set(pin, direction) {
   if (pinMap[pin] !== "write") {
-    return setup(pin, GPIO_WRITE, WRITE_EDGE).then(() => write(pin, direction));
+    return setup(pin, GPIO_WRITE, WRITE_EDGE)
+    .then(() => {
+      pinMap[pin] = "write";
+      return write(pin, direction)
+    });
   } else {
     return write(pin, direction);
   }
@@ -105,8 +123,15 @@ function shutdown() {
   return new P(resolve => gpio.destroy(() => resolve()));
 }
 
+function listen(listener) {
+  gpio.on('change', function(channel, value) {
+    listener(channel, value);
+  });
+}
+
 module.exports = {
   get: get,
+  listen: listen,
   off: off,
   on: on,
   pulse: pulse,

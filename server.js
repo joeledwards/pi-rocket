@@ -19,7 +19,7 @@ let burning = false;
 
 let countDownDuration = 10000;
 let burnDuration = 5000;
-let noPi = true;
+let noPi = false;
 
 function pinOn(pin) {
   return noPi ? P.resolve() : pi.on(pin);
@@ -68,7 +68,7 @@ function relayOn() {
         });
       })
       .catch((error) => {
-        logger.error('Error:', error)
+        console.error('Error:', error)
         resolve({
           code: 500,
           response: {status: 'error'},
@@ -94,7 +94,7 @@ function relayOff() {
         });
       })
       .catch((error) => {
-        logger.error('Error:', error)
+        console.error('Error:', error)
         resolve({
           code: 500,
           response: {status: 'error'},
@@ -235,8 +235,8 @@ const app = express();
 cogs.client.getClient('./cogswell.json')
 .then(client => {
   // Publish a message to the control bus
-  function publish(channel, message) {
-    return cogsClient.sendEvent('directive', 'pi-rocket', {'channel': channel, 'command': command})
+  function publish(channel, command) {
+    return client.sendEvent('pi-rocket', 'notification', {'channel': channel, 'command': command})
     .then(({event_id: eventId}) => console.log(`Published event '${eventId}' to Cogs.`))
     .catch(error => console.error(`Error sending event to Cogs:`, error));
   }
@@ -291,6 +291,10 @@ cogs.client.getClient('./cogswell.json')
 
         break;
     }
+  });
+
+  pi.listen((channel, value) => {
+    console.log(`${channel} is now ${value}`);
   });
 
   // Serve up the control website
