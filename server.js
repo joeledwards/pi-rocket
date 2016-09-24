@@ -251,7 +251,8 @@ cogs.client.getClient('./cogswell.json')
   ws.on('ack', messageId => console.error(`Message ${messageId} acknowledged.`));
 
   ws.on('message', message => {
-    let {data: {command}, message_id: messageId} = JSON.parse(message);
+    let {data, message_id: messageId} = JSON.parse(message);
+    let {command} = JSON.parse(data);
 
     // Control via Cogswell
     switch (command) {
