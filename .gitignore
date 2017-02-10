@@ -1,4 +1,5 @@
 node_modules
 .*.swp
 cogswell.json
+cogs-pubsub.json
 npm-debug.log
