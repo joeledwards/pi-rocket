@@ -3,40 +3,54 @@ const cogs = require('cogs-sdk');
 const express = require('express');
 
 const bindPort = 8080;
-const app = express();
 
-cogs.client.getClient('../cogswell.json')
-.then(client => {
-  console.log('Cogswell client allocated.');
-
-  // Publish a message to the control bus
-  function publish(channel, command) {
-    return client.sendEvent('pi-rocket', 'control', {'channel': channel, 'command': command})
-    .then(({event_id: eventId}) => {
-      console.log(`Published event '${eventId}' to Cogs.`)
-    })
-    .catch(error => {
-      console.error(`Error sending event to Cogs:`, error)
+const config;
+function getConfig() {
+  if (!config) {
+    config = new P((resolve, reject) => {
+      fs.readFile('../cogs-pubsub.json', (error, raw) => {
+        if (error) {
+          reject(error);
+        } else {
+          resolve(JSON.parse(raw));
+        }
+      })
     });
   }
 
-  const notifyWs = client.subscribe('pi-rocket', {channel: 'pi-rocket-notifications'});
-  notifyWs.on('connectFailed', (error) => console.error("Error connecting to notify channel:", error));
-  notifyWs.on('error', error => console.error('Error on notification channel:', error));
-  notifyWs.on('open', () => console.log('Connected to notification channel.'));
-  notifyWs.on('reconnect', () => console.log('Reconnected to notification channel.'));
-  notifyWs.on('close', () => console.error('Notification channel closed.'));
-  notifyWs.on('ack', messageId => console.error(`Message ${messageId} acknowledged.`));
-  notifyWs.on('message', message => {
-    let {data: {command}, message_id: messageId} = JSON.parse(message);
+  return config;
+}
 
+function runServer(handle) {
+  console.log('Pub/Sub connection established.');
+
+  // Publish a message to the control bus
+  function publish(channel, command) {
+    return handle.publishWithAck(channel, command)
+    .catch(error => {
+      console.error(`Error sending command '${command}' to channel '${chanel}'`);
+      throw error;
+    });
+  }
+
+  handle.on('error', error => console.error('Error with control socket:', error));
+  handle.on('reconnect', () => console.log('Reconnected to control bus channel.'));
+
+  // Log all notifications from the ignition system.
+  handle.subscribe('pi-rocket-notifications', message => {
     console.log(`Received a notification message: ${message}`);
-  });
+  })
+  .then(() => console.log("Subscribed to the notification channel."))
+  .catch(error => console.error("Error subscribing to the notification channel", error));
 
-  const echoWs = client.subscribe('pi-rocket', {channel: 'pi-rocket-control'})
-  echoWs.on('message', message => console.log(`Received a control message: ${message}`));
-  echoWs.on('error', error => console.error('Error on control channel:', error));
-  echoWs.on('connectFailed', error => console.error('Error connecting to control channel:', error));
+  // Echo all control commands back to the controller.
+  client.subscribe('pi-rocket-control', message => {
+    console.log(`Received a control message: ${message}`);
+  })
+  .then(() => console.log("Subscribed to the control channel."))
+  .catch(error => console.error("Error subscribing to the control channel", error));
+
+  const app = express();
 
   // Serve up the control website
   app.use('/control', express.static('../public'));
@@ -77,5 +91,13 @@ cogs.client.getClient('../cogswell.json')
   });
 
   app.listen(bindPort, console.log(`Listening on port ${bindPort}`));
-});
+}
 
+function main() {
+  getConfig()
+  .then(({keys, options}) => cogs.pubsub.connect(keys, options))
+  .then(handle => runServer(handle))
+  .catch(error => console.error("Error with launch control server:", error));
+}
+
+main();

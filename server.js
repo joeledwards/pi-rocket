@@ -230,29 +230,42 @@ function relayCancelCountDown() {
   });
 }
 
-const app = express();
-
-cogs.client.getClient('./cogswell.json')
-.then(client => {
-  // Publish a message to the control bus
-  function publish(channel, command) {
-    return client.sendEvent('pi-rocket', 'notification', {'channel': channel, 'command': command})
-    .then(({event_id: eventId}) => console.log(`Published event '${eventId}' to Cogs.`))
-    .catch(error => console.error(`Error sending event to Cogs:`, error));
+const config;
+function getConfig() {
+  if (!config) {
+    config = new P((resolve, reject) => {
+      fs.readFile('../cogs-pubsub.json', (error, raw) => {
+        if (error) {
+          reject(error);
+        } else {
+          resolve(JSON.parse(raw));
+        }
+      })
+    });
   }
 
-  const ws = client.subscribe('pi-rocket', {'channel': 'pi-rocket-control'});
+  return config;
+}
 
-  ws.on('connectFailed', (error) => console.error("Error subscribing to channel:", error));
-  ws.on('error', error => console.error('Error on control channel:', error));
-  ws.on('open', () => console.log('Connected to control channel.'));
-  ws.on('reconnect', () => console.log('Reconnected to control channel.'));
-  ws.on('close', () => console.error('Control channel closed.'));
-  ws.on('ack', messageId => console.error(`Message ${messageId} acknowledged.`));
+function runServer(handle) {
+  const app = express();
 
-  ws.on('message', message => {
-    let {data, message_id: messageId} = JSON.parse(message);
-    let {command} = JSON.parse(data);
+  // Publish a message to the control bus
+  function publish(channel, notification) {
+    return handle.publishWithAck(channel, notification)
+    .catch(error => {
+      console.error(`Error publishing notification '${notification}' to channel '${chanel}'`);
+      throw error;
+    });
+  }
+
+  handle.on('error', error => console.error('Error with control socket:', error));
+  handle.on('reconnect', () => console.log('Reconnected to control bus channel.'));
+
+  // Echo all control commands back to the controller.
+  client.subscribe('pi-rocket-control', message => {
+    console.log(`Received a command message: ${message}`);
+    const {message: command} = message;
 
     // Control via Cogswell
     switch (command) {
@@ -291,7 +304,9 @@ cogs.client.getClient('./cogswell.json')
 
         break;
     }
-  });
+  })
+  .then(() => console.log("Subscribed to the control channel."))
+  .catch(error => console.error("Error subscribing to the control channel", error));
 
   pi.listen((channel, value) => {
     console.log(`${channel} is now ${value}`);
@@ -326,5 +341,14 @@ cogs.client.getClient('./cogswell.json')
   });
 
   app.listen(bindPort, console.log(`Listening on port ${bindPort}`));
-});
+}
+
+function main() {
+  getConfig()
+  .then(({keys, options}) => cogs.pubsub.connect(keys, options))
+  .then(handle => runServer(handle))
+  .catch(error => console.error("Error in ignition system:", error));
+}
+
+main();
 
