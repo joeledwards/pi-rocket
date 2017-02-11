@@ -264,8 +264,8 @@ function runServer(handle) {
 
   // Echo all control commands back to the controller.
   client.subscribe('pi-rocket-control', message => {
-    console.log(`Received a command message: ${JSON.stringify(message)}`);
     const {message: command} = message;
+    console.log(`Received a command message: ${command}`);
 
     // Control via Cogswell
     switch (command) {
