@@ -263,7 +263,7 @@ function runServer(handle) {
   handle.on('reconnect', () => console.log('Reconnected to control bus channel.'));
 
   // Echo all control commands back to the controller.
-  client.subscribe('pi-rocket-control', message => {
+  handle.subscribe('pi-rocket-control', message => {
     const {message: command} = message;
     console.log(`Received a command message: ${command}`);
 
