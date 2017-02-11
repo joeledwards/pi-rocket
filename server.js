@@ -254,7 +254,7 @@ function runServer(handle) {
   function publish(channel, notification) {
     return handle.publishWithAck(channel, notification)
     .catch(error => {
-      console.error(`Error publishing notification '${notification}' to channel '${chanel}'`);
+      console.error(`Error publishing notification '${notification}' to channel '${channel}'`);
       throw error;
     });
   }
@@ -264,7 +264,7 @@ function runServer(handle) {
 
   // Echo all control commands back to the controller.
   client.subscribe('pi-rocket-control', message => {
-    console.log(`Received a command message: ${message}`);
+    console.log(`Received a command message: ${JSON.stringify(message)}`);
     const {message: command} = message;
 
     // Control via Cogswell

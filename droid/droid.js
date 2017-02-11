@@ -1,3 +1,4 @@
+const P = require('bluebird');
 const fs = require('fs');
 const cogs = require('cogs-sdk');
 const express = require('express');
@@ -28,7 +29,7 @@ function runServer(handle) {
   function publish(channel, command) {
     return handle.publishWithAck(channel, command)
     .catch(error => {
-      console.error(`Error sending command '${command}' to channel '${chanel}'`);
+      console.error(`Error sending command '${command}' to channel '${channel}'`);
       throw error;
     });
   }
@@ -38,14 +39,14 @@ function runServer(handle) {
 
   // Log all notifications from the ignition system.
   handle.subscribe('pi-rocket-notifications', message => {
-    console.log(`Received a notification message: ${message}`);
+    console.log(`Received a notification message: ${message.message}`);
   })
   .then(() => console.log("Subscribed to the notification channel."))
   .catch(error => console.error("Error subscribing to the notification channel", error));
 
   // Echo all control commands back to the controller.
-  client.subscribe('pi-rocket-control', message => {
-    console.log(`Received a control message: ${message}`);
+  handle.subscribe('pi-rocket-control', message => {
+    console.log(`Received a control message: ${message.message}`);
   })
   .then(() => console.log("Subscribed to the control channel."))
   .catch(error => console.error("Error subscribing to the control channel", error));
