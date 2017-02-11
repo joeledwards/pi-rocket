@@ -230,11 +230,11 @@ function relayCancelCountDown() {
   });
 }
 
-const config;
+let config;
 function getConfig() {
   if (!config) {
     config = new P((resolve, reject) => {
-      fs.readFile('../cogs-pubsub.json', (error, raw) => {
+      fs.readFile('cogs-pubsub.json', (error, raw) => {
         if (error) {
           reject(error);
         } else {
