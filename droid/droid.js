@@ -4,7 +4,7 @@ const express = require('express');
 
 const bindPort = 8080;
 
-const config;
+let config;
 function getConfig() {
   if (!config) {
     config = new P((resolve, reject) => {
