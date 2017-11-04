@@ -1,3 +1,5 @@
+require('log-a-log');
+
 const P = require('bluebird');
 const fs = require('fs');
 const cogs = require('cogs-sdk');
