@@ -3,3 +3,4 @@ node_modules
 cogswell.json
 cogs-pubsub.json
 npm-debug.log
+package-lock.json
