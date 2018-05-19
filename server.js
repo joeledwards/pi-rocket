@@ -1,37 +1,41 @@
-require('log-a-log');
+require('log-a-log')();
 
 const _ = require('lodash');
-const P = require('bluebird');
 const fs = require('fs');
-const cogs = require('cogs-sdk');
+const PubNub = require('pubnub');
 const express = require('express');
 const durations = require('durations');
 
-const pi = require('./pi');
+const bindHost = coalesce(process.env.PI_ROCKET_BIND_HOST, '0.0.0.0');
+const bindPort = coalesce(process.env.PI_ROCKET_BIND_PORT, 8080);
 
-const bindPort = 8080;
+let countDownDuration = 10000;
+let burnDuration = 5000;
+let noPi = coalesce(process.env.PI_ROCKET_NO_PI, false);
 
-const countDownWatch = durations.stopwatch();
-const burnWatch = durations.stopwatch();
+const pi = noPi ? {} : require('./pi')
 
 let countingDown = false;
 let burning = false;
 
-let countDownDuration = 10000;
-let burnDuration = 5000;
-let noPi = false;
+const countDownWatch = durations.stopwatch();
+const burnWatch = durations.stopwatch();
+
+function coalesce() {
+  return Object.values(arguments).filter(x => x !== null && x !== undefined)[0]
+}
 
 function pinOn(pin) {
-  return noPi ? P.resolve() : pi.on(pin);
+  return noPi ? Promise.resolve() : pi.on(pin);
 }
 
 function pinOff(pin) {
-  return noPi ? P.resolve() : pi.off(pin);
+  return noPi ? Promise.resolve() : pi.off(pin);
 }
 
 // Sleep (non-blocking) for the specified duration.
 function sleep(duration) {
-  return new P(resolve => setTimeout(() => resolve(), duration));
+  return new Promise(resolve => setTimeout(resolve, duration));
 }
 
 function countDownRemaining() {
@@ -47,7 +51,7 @@ function burnRemaining() {
 }
 
 function relayOn() {
-  return new P((resolve, reject) => {
+  return new Promise((resolve, reject) => {
     if (burning) {
       console.log('Ignition already active.');
       resolve({
@@ -79,7 +83,7 @@ function relayOn() {
 }
 
 function relayOff() {
-  return new P((resolve, reject) => {
+  return new Promise((resolve, reject) => {
     if (burning) {
       console.log('Deactivating ignition.');
       burning = false;
@@ -111,9 +115,9 @@ function relayOff() {
 }
 
 function relayStatus() {
-  return new P((resolve, reject) => {
+  return new Promise((resolve, reject) => {
     if (burning) {
-      console.log(`Ignition is active, remaining duration is ${countDownRemaining()}.`);
+      console.log(`Ignition is active, remaining duration is ${burnRemaining()}.`);
 
       resolve({
         code: 200,
@@ -123,7 +127,7 @@ function relayStatus() {
         },
       });
     } else if (countingDown) {
-      console.log(`Countdown is active, remaining duration is ${burnRemaining()}.`);
+      console.log(`Countdown is active, remaining duration is ${countDownRemaining()}.`);
 
       resolve({
         code: 200,
@@ -144,7 +148,7 @@ function relayStatus() {
 }
 
 function relayCountDown() {
-  return new P((resolve, reject) => {
+  return new Promise((resolve, reject) => {
     if (burning) {
       console.log(`Ignition active, ${burnRemaining()} remaining.`);
 
@@ -170,7 +174,7 @@ function relayCountDown() {
             burning = true;
             countDownWatch.reset();
             burnWatch.reset().start();
-            console.log(`Ignition on, ${countDownRemaining()} remaining.`);
+            console.log(`Ignition on, ${burnRemaining()} remaining.`);
 
             return pinOn(32)
             .then(() => sleep(5000))
@@ -199,7 +203,7 @@ function relayCountDown() {
 }
 
 function relayCancelCountDown() {
-  return new P((resolve, reject) => {
+  return new Promise((resolve, reject) => {
     if (burning) {
       console.log(`Burn active, ${burnRemaining()} remaining.`);
 
@@ -230,15 +234,20 @@ function relayCancelCountDown() {
   });
 }
 
+let configPath = process.env.PI_ROCKET_CONFIG || 'pubnub.json'
 let config;
 function getConfig() {
   if (!config) {
-    config = new P((resolve, reject) => {
-      fs.readFile('cogs-pubsub.json', (error, raw) => {
-        if (error) {
-          reject(error);
-        } else {
-          resolve(JSON.parse(raw));
+    config = new Promise((resolve, reject) => {
+      fs.readFile(configPath, (error, raw) => {
+        try {
+          if (error) {
+            reject(error);
+          } else {
+            resolve(JSON.parse(raw));
+          }
+        } catch (err) {
+          reject(err)
         }
       })
     });
@@ -247,27 +256,38 @@ function getConfig() {
   return config;
 }
 
-function runServer(handle) {
-  const app = express();
+function runServer({pubKey, subKey}) {
+  const pubnub = new PubNub({
+    publish_key: pubKey,
+    subscribe_key: subKey
+  })
 
   // Publish a message to the control bus
   function publish(channel, notification) {
-    return handle.publishWithAck(channel, notification)
-    .catch(error => {
-      console.error(`Error publishing notification '${notification}' to channel '${channel}'`);
-      throw error;
-    });
+    return new Promise(resolve => {
+      pubnub.publish({
+        channel,
+        message: notification,
+      }, (status, response) => resolve())
+    })
   }
 
-  handle.on('error', error => console.error('Error with control socket:', error));
-  handle.on('reconnect', () => console.log('Reconnected to control bus channel.'));
+  pubnub.addListener({
+    status: event => console.log('PubNub status event:', event),
+    presence: event => console.log('PubNub presence event:', eent),
+    message: commandHandler,
+  })
+
+  pubnub.subscribe({
+    channels: ['pi-rocket-control']
+  })
 
   // Echo all control commands back to the controller.
-  handle.subscribe('pi-rocket-control', message => {
-    const {message: command} = message;
+  function commandHandler (msg) {
+    const {message: command} = msg;
     console.log(`Received a command message: ${command}`);
 
-    // Control via Cogswell
+    // Control via PubNub
     switch (command) {
       case 'relay-on': 
         relayOn().then(
@@ -304,13 +324,15 @@ function runServer(handle) {
 
         break;
     }
-  })
-  .then(() => console.log("Subscribed to the control channel."))
-  .catch(error => console.error("Error subscribing to the control channel", error));
+  }
 
-  pi.listen((channel, value) => {
-    console.log(`${channel} is now ${value}`);
-  });
+  if (!noPi) {
+    pi.listen((channel, value) => {
+      console.log(`${channel} is now ${value}`);
+    });
+  }
+
+  const app = express();
 
   // Serve up the control website
   app.use('/control', express.static('public'));
@@ -340,14 +362,18 @@ function runServer(handle) {
     relayCancelCountDown().then(r => res.status(r.code).json(r.response));
   });
 
-  app.listen(bindPort, console.log(`Listening on port ${bindPort}`));
+  app.listen(bindPort, bindHost, () => {
+    console.log(`Listening on ${bindHost}:${bindPort} ...`);
+  })
 }
 
 function main() {
   getConfig()
-  .then(({keys, options}) => cogs.pubsub.connect(keys, options))
-  .then(handle => runServer(handle))
-  .catch(error => console.error("Error in ignition system:", error));
+  .then(runServer)
+  .catch(error => {
+    console.error("Error in ignition system:", error)
+    process.exit(1)
+  });
 }
 
 main();
