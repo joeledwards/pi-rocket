@@ -23,7 +23,8 @@ function piRocket () {
     restart_delay: 5000,
     env: {
       PI_ROCKET_BIND_PORT: 9080,
-      PI_ROCKET_BIND_HOST: '127.0.0.1'
+      PI_ROCKET_BIND_HOST: '127.0.0.1',
+      PI_ROCKET_NO_PI: true
     },
     production_env: {
       PI_ROCKET_BIND_PORT: 8080,
