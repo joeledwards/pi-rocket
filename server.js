@@ -6,12 +6,13 @@ const PubNub = require('pubnub');
 const express = require('express');
 const durations = require('durations');
 
+const configPath = coalesce(process.env.PI_ROCKET_CONFIG, 'pubnub.json');
 const bindHost = coalesce(process.env.PI_ROCKET_BIND_HOST, '0.0.0.0');
 const bindPort = coalesce(process.env.PI_ROCKET_BIND_PORT, 8080);
+const noPi = coalesce(process.env.PI_ROCKET_NO_PI, false);
 
 let countDownDuration = 10000;
 let burnDuration = 5000;
-let noPi = coalesce(process.env.PI_ROCKET_NO_PI, false);
 
 const pi = noPi ? {} : require('./pi')
 
@@ -234,7 +235,6 @@ function relayCancelCountDown() {
   });
 }
 
-let configPath = process.env.PI_ROCKET_CONFIG || 'pubnub.json'
 let config;
 function getConfig() {
   if (!config) {

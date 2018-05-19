@@ -4,9 +4,9 @@ const fs = require('fs');
 const PubNub = require('pubnub');
 const express = require('express');
 
+const configPath = coalesce(process.env.PI_ROCKET_CONFIG, 'pubnub.json')
 const bindPort = coalesce(process.env.PI_ROCKET_BIND_PORT, 8080);
 const bindHost = coalesce(process.env.PI_ROCKET_BIND_HOST, '0.0.0.0');
-const configPath = coalesce(process.env.PI_ROCKET_CONFIG, 'pubnub.json')
 
 let config;
 function getConfig() {
