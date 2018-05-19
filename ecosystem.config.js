@@ -18,6 +18,7 @@ function piRocket () {
     pid_file: pidFile,
     out_file: outLog,
     error_file: errLog,
+    kill_timeout: 2500,
     min_uptime: 2000,
     max_restarts: 0,
     restart_delay: 5000,

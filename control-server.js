@@ -114,6 +114,21 @@ function runServer({pubKey, subKey}) {
     .catch(error => res.status(500).json({code: 500}));
   });
 
+  app.get('/routes', (req, res) => {
+    res.status(200).json(
+      app._router.stack
+      .filter(r => r.route)
+      .map(
+        ({
+          route: {
+            path,
+            stack: [{method}] = []
+          } = {}
+        }) => ({method, path})
+      )
+    )
+  })
+
   app.listen(bindPort, bindHost, () => {
     console.log(`Listening on ${bindHost}:${bindPort} ...`)
   });

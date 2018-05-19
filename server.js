@@ -362,6 +362,22 @@ function runServer({pubKey, subKey}) {
     relayCancelCountDown().then(r => res.status(r.code).json(r.response));
   });
 
+  app.get('/routes', (req, res) => {
+    console.log('routes:', app._router.stack)
+    res.status(200).json(
+      app._router.stack
+      .filter(r => r.route)
+      .map(
+        ({
+          route: {
+            path,
+            stack: [{method}] = []
+          } = {}
+        }) => ({method, path})
+      )
+    )
+  })
+
   app.listen(bindPort, bindHost, () => {
     console.log(`Listening on ${bindHost}:${bindPort} ...`);
   })
