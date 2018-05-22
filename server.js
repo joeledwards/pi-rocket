@@ -273,8 +273,18 @@ function runServer({pubKey, subKey}) {
   }
 
   pubnub.addListener({
-    status: event => console.log('PubNub status event:', event),
-    presence: event => console.log('PubNub presence event:', eent),
+    status: event => {
+      if (event.error)
+        console.error('PubNub status error:', event)
+      else
+        console.log('PubNub status event:', event)
+    },
+    presence: event => {
+      if (event.error)
+        console.log('PubNub presence error:', eent)
+      else
+        console.log('PubNub presence event:', eent)
+    },
     message: commandHandler,
   })
 
@@ -392,8 +402,6 @@ function main() {
   });
 }
 
-main();
-
 process
 .on('unhandledRejection', (reason, p) => {
   console.error(reason, 'Unhandled Rejection at Promise', p);
@@ -401,4 +409,7 @@ process
 .on('uncaughtException', err => {
   console.error(err, 'Uncaught Exception thrown');
   process.exit(1);
-});
+})
+.on('exit', () => console.log(`Exit ${process.pid}`));
+
+main();
