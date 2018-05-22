@@ -3,21 +3,22 @@ function piRocket () {
 
   const srcDir = process.env.PI_ROCKET_SRC_DIR || '/home/joel/dev/pi-rocket'
   const appDir = process.env.PI_ROCKET_APP_DIR || '/opt/pi-rocket'
-  const logDir = `${appDir}/logs`
-
-  const outLog = `${logDir}/out.log`
-  const errLog = `${logDir}/err.log`
-
-  const configFile = `${appDir}/pubnub.json`
-  const pidFile = `${appDir}/${name}.pid`
   const script = `${srcDir}/server.js`
+
+  const logDir = `${appDir}/logs`
+  const infoLog = `${logDir}/info.log`
+  const errorLog = `${logDir}/error.log`
+
+  const pidFile = `${appDir}/${name}.pid`
+  const configFile = `${appDir}/pubnub.json`
 
   return {
     name,
     script,
+    cwd: srcDir,
     pid_file: pidFile,
-    out_file: outLog,
-    error_file: errLog,
+    out_file: infoLog,
+    error_file: errorLog,
     kill_timeout: 2500,
     min_uptime: 2000,
     max_restarts: 0,
