@@ -394,6 +394,8 @@ function runServer({pubKey, subKey}) {
 }
 
 function main() {
+  console.log('Starting launch server...')
+
   getConfig()
   .then(runServer)
   .catch(error => {

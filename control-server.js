@@ -145,6 +145,8 @@ function runServer({pubKey, subKey}) {
 }
 
 function main() {
+  console.log('Starting control server...')
+
   getConfig()
   .then(handle => runServer(handle))
   .catch(error => {
