@@ -394,6 +394,10 @@ function runServer({pubKey, subKey}) {
 }
 
 function main() {
+  console.log(`  config-path : ${configPath}`)
+  console.log(`    bind-host : ${bindHost}`)
+  console.log(`    bind-port : ${bindPort}`)
+  console.log(`        no-pi : ${noPi}`)
   console.log('Starting launch server...')
 
   getConfig()

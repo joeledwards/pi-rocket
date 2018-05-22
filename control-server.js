@@ -145,6 +145,9 @@ function runServer({pubKey, subKey}) {
 }
 
 function main() {
+  console.log(`  config-path : ${configPath}`)
+  console.log(`    bind-host : ${bindHost}`)
+  console.log(`    bind-port : ${bindPort}`)
   console.log('Starting control server...')
 
   getConfig()
