@@ -373,7 +373,6 @@ function runServer({pubKey, subKey}) {
   });
 
   app.get('/routes', (req, res) => {
-    console.log('routes:', app._router.stack)
     res.status(200).json(
       app._router.stack
       .filter(r => r.route)
