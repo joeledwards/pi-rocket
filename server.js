@@ -299,6 +299,16 @@ function runServer({pubKey, subKey}) {
 
     // Control via PubNub
     switch (command) {
+      case 'relay-pulse':
+        relayOn().then(
+          r => publish('pi-rocket-notifications', JSON.stringify(r))
+        ).then(
+          () => new Promise(cb => setTimeout(cb, 1000))
+        ).then(
+          () => relayOff()
+        ).then(
+          r => publish('pi-rocket-notifications', JSON.stringify(r))
+        );
       case 'relay-on': 
         relayOn().then(
           r => publish('pi-rocket-notifications', JSON.stringify(r))

@@ -89,6 +89,13 @@ function runServer({pubKey, subKey}) {
   // Serve up the control website
   app.use('/control', express.static('public'));
 
+  // Pulse relay
+  app.post('/pulse', (req, res) => {
+    publish('pi-rocket-control', 'relay-pulse')
+    .then(() => res.status(200).json({code: 200}))
+    .catch(error => res.status(500).jston({code: 500}));
+  });
+
   // Switch relay on
   app.post('/on', (req, res) => {
     publish('pi-rocket-control', 'relay-on')
