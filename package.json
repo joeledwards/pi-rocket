@@ -25,13 +25,13 @@
   },
   "homepage": "https://github.com/joeledwards/pi-rocket#readme",
   "dependencies": {
-    "bluebird": "^3.5.1",
+    "bluebird": "^3.5.3",
     "durations": "^3.4.1",
-    "express": "^4.16.3",
-    "lodash": "^4.17.10",
-    "log-a-log": "^6.0.0",
-    "pubnub": "^4.20.3",
+    "express": "^4.16.4",
+    "lodash": "^4.17.11",
+    "log-a-log": "^6.1.0",
+    "pubnub": "^4.21.6",
     "rpi-gpio": "^0.7.0",
-    "yargs": "^11.0.0"
+    "yargs": "^11.1.0"
   }
 }

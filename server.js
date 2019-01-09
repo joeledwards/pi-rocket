@@ -52,7 +52,7 @@ function burnRemaining() {
 }
 
 function relayOn() {
-  return new Promise((resolve, reject) => {
+  return new Promise(async resolve => {
     if (burning) {
       console.log('Ignition already active.');
       resolve({
@@ -64,59 +64,57 @@ function relayOn() {
       burning = true;
       burnWatch.reset().start();
 
-      pinOn(32)
-      .then(() => {
+      try {
+        await pinOn(32)
         console.log('Ignition active.');
         resolve({
           code: 200,
           response: {status: 'ignition-active'},
         });
-      })
-      .catch((error) => {
+      } catch (error) {
         console.error('Error:', error)
         resolve({
           code: 500,
           response: {status: 'error'},
         });
-      });
+      }
     }
-  });
+  })
 }
 
 function relayOff() {
-  return new Promise((resolve, reject) => {
+  return new Promise(async resolve => {
     if (burning) {
       console.log('Deactivating ignition.');
       burning = false;
       burnWatch.reset();
 
-      pinOff(32)
-      .then(() => {
+      try {
+        await pinOff(32)
         console.log('Ignition deactivated.');
         resolve({
           code: 200,
           response: {status: 'inactive'},
         });
-      })
-      .catch((error) => {
+      } catch (error) {
         console.error('Error:', error)
         resolve({
           code: 500,
           response: {status: 'error'},
-        });
-      });
+        })
+      }
     } else {
       console.log('Ignition already inactive');
       resolve({
         code: 200,
         response: {status: 'inactive'},
-      });
+      })
     }
-  });
+  })
 }
 
 function relayStatus() {
-  return new Promise((resolve, reject) => {
+  return new Promise(resolve => {
     if (burning) {
       console.log(`Ignition is active, remaining duration is ${burnRemaining()}.`);
 
@@ -149,7 +147,7 @@ function relayStatus() {
 }
 
 function relayCountDown() {
-  return new Promise((resolve, reject) => {
+  return new Promise(async resolve => {
     if (burning) {
       console.log(`Ignition active, ${burnRemaining()} remaining.`);
 
@@ -168,28 +166,31 @@ function relayCountDown() {
         countDownWatch.reset().start();
         console.log(`Starting countdown, ${countDownRemaining()} remaining.`);
 
-        sleep(countDownDuration)
-        .then(() => {
+        try {
+          await sleep(countDownDuration)
+
           if (countingDown) {
             countingDown = false;
             burning = true;
             countDownWatch.reset();
             burnWatch.reset().start();
+
+            await pinOn(32)
             console.log(`Ignition on, ${burnRemaining()} remaining.`);
 
-            return pinOn(32)
-            .then(() => sleep(5000))
-            .then(() => {
-              burning = false;
-              burnWatch.reset();
-              console.log(`Ignition off.`);
-              pinOff(32)
-            });
+            await sleep(burnRemaining().millis())
+
+            await pinOff(32)
+            console.log(`Ignition off.`);
+
+            burning = false;
+            burnWatch.reset();
           } else {
             console.log('Ignition cancelled.');
           }
-        })
-        .catch((error) => console.error('Error during launch:', error));
+        } catch (error) {
+          console.error('Error during launch:', error)
+        }
       }
 
       resolve({
@@ -204,7 +205,7 @@ function relayCountDown() {
 }
 
 function relayCancelCountDown() {
-  return new Promise((resolve, reject) => {
+  return new Promise(resolve => {
     if (burning) {
       console.log(`Burn active, ${burnRemaining()} remaining.`);
 
@@ -241,11 +242,7 @@ function getConfig() {
     config = new Promise((resolve, reject) => {
       fs.readFile(configPath, (error, raw) => {
         try {
-          if (error) {
-            reject(error);
-          } else {
-            resolve(JSON.parse(raw));
-          }
+          error ? reject(error) : resolve(JSON.parse(raw))
         } catch (err) {
           reject(err)
         }
@@ -293,50 +290,43 @@ function runServer({pubKey, subKey}) {
   })
 
   // Echo all control commands back to the controller.
-  function commandHandler (msg) {
+  async function commandHandler (msg) {
     const {message: command} = msg;
     console.log(`Received a command message: ${command}`);
 
     // Control via PubNub
     switch (command) {
       case 'relay-pulse':
-        relayOn().then(
-          r => publish('pi-rocket-notifications', JSON.stringify(r))
-        ).then(
-          () => new Promise(cb => setTimeout(cb, 1000))
-        ).then(
-          () => relayOff()
-        ).then(
-          r => publish('pi-rocket-notifications', JSON.stringify(r))
-        );
+        const rOn = await relayOn()
+        await publish('pi-rocket-notifications', JSON.stringify(rOn))
+        await sleep(1000)
+        const rOff = await relayOff()
+        await publish('pi-rocket-notifications', JSON.stringify(rOff))
+
+        break;
       case 'relay-on': 
-        relayOn().then(
-          r => publish('pi-rocket-notifications', JSON.stringify(r))
-        );
+        const r = await relayOn()
+        await publish('pi-rocket-notifications', JSON.stringify(r))
         
         break;
       case 'relay-off': 
-        relayOff().then(
-          r => publish('pi-rocket-notifications', JSON.stringify(r))
-        );
+        const r = await relayOff()
+        await publish('pi-rocket-notifications', JSON.stringify(r))
 
         break;
       case 'status':
-        relayStatus().then(
-          r => publish('pi-rocket-notifications', JSON.stringify(r))
-        );
+        const r = await relayStatus()
+        await publish('pi-rocket-notifications', JSON.stringify(r))
 
         break;
       case 'count-down':
-        relayCountDown().then(
-          r => publish('pi-rocket-notifications', JSON.stringify(r))
-        );
+        const r = await relayCountDown()
+        await publish('pi-rocket-notifications', JSON.stringify(r))
 
         break;
       case 'cancel-count-down':
-        relayCancelCountDown().then(
-          r => publish('pi-rocket-notifications', JSON.stringify(r))
-        );
+        const r = await relayCancelCountDown()
+        await publish('pi-rocket-notifications', JSON.stringify(r))
 
         break;
       default:
@@ -347,6 +337,7 @@ function runServer({pubKey, subKey}) {
   }
 
   if (!noPi) {
+    // Report on changes to the value of the identified channel
     pi.listen((channel, value) => {
       console.log(`${channel} is now ${value}`);
     });
@@ -402,29 +393,31 @@ function runServer({pubKey, subKey}) {
   })
 }
 
-function main() {
+async function main() {
   console.log(`  config-path : ${configPath}`)
   console.log(`    bind-host : ${bindHost}`)
   console.log(`    bind-port : ${bindPort}`)
   console.log(`        no-pi : ${noPi}`)
   console.log('Starting launch server...')
 
-  getConfig()
-  .then(runServer)
-  .catch(error => {
+  try {
+    const config = await getConfig()
+    await runServer(config)
+  } catch (error) {
     console.error("Error in ignition system:", error)
     process.exit(1)
-  });
+  }
 }
 
-process
-.on('unhandledRejection', (reason, p) => {
+process.on('unhandledRejection', (reason, p) => {
   console.error(reason, 'Unhandled Rejection at Promise', p);
 })
-.on('uncaughtException', err => {
+
+process.on('uncaughtException', err => {
   console.error(err, 'Uncaught Exception thrown');
   process.exit(1);
 })
-.on('exit', () => console.log(`Exit ${process.pid}`));
+
+process.on('exit', () => console.log(`Exit ${process.pid}`));
 
 main();
