@@ -41,8 +41,12 @@ const GPIO_WRITE = gpio.DIR_OUT
 
 const pinMap = {}
 
+async sleep (duration) {
+  return new P(resolve => setTimeout(resolve, duration))
+}
+
 // Setup the GPIO pin.
-function setup (pin, ioDirection, edge) {
+async function setup (pin, ioDirection, edge) {
   return new P((resolve, reject) => {
     gpio.setup(pin, ioDirection, edge, (error) => {
       if (error) {
@@ -57,68 +61,56 @@ function setup (pin, ioDirection, edge) {
 }
 
 // Read from the specified GPIO pin.
-function read (pin) {
+async function read (pin) {
   return P.promisify(gpio.read)(pin)
 }
 
 // Write to the specified GPIO pin.
-function write (pin, direction) {
+async function write (pin, direction) {
   return P.promisify(gpio.write)(pin, direction)
 }
 
 // Get the current value of the specified GPIO pin.
-function get (pin) {
+async function get (pin) {
   if (pinMap[pin] !== 'read') {
-    return setup(pin, GPIO_READ, READ_EDGE)
-      .then(() => {
-        pinMap[pin] = 'read'
-        return read(pin)
-      })
+    await setup(pin, GPIO_READ, READ_EDGE)
+    pinMap[pin] = 'read'
+    return read(pin)
   } else {
     return read(pin)
   }
 }
 
 // Set the current value of the specified GPIO pin.
-function set (pin, direction) {
+async function set (pin, direction) {
   if (pinMap[pin] !== 'write') {
-    return setup(pin, GPIO_WRITE, WRITE_EDGE)
-      .then(() => {
-        pinMap[pin] = 'write'
-        return write(pin, direction)
-      })
+    await setup(pin, GPIO_WRITE, WRITE_EDGE)
+    pinMap[pin] = 'write'
+    return write(pin, direction)
   } else {
     return write(pin, direction)
   }
 }
 
 // Set a GPIO pin to ON voltage.
-function on (pin) {
+async function on (pin) {
   return set(pin, ON)
 }
 
 // Set a GPIO pin to OFF voltage.
-function off (pin) {
+async function off (pin) {
   return set(pin, OFF)
 }
 
 // Pulse the pin to ON voltage for duration.
-function pulse (pin, duration) {
-  return new P((resolve, reject) => {
-    on(pin)
-      .then(() => {
-        setTimeout(() => {
-          off(pin)
-            .then(() => resolve())
-            .catch((error) => reject(error))
-        }, duration)
-      })
-      .catch((error) => reject(error))
-  })
+async function pulse (pin, duration) {
+  await on(pin)
+  await sleep(duration)
+  await off(pin)
 }
 
 // Shutdown the GPIO lib.
-function shutdown () {
+async function shutdown () {
   return new P(resolve => gpio.destroy(() => resolve()))
 }
 
