@@ -26,16 +26,16 @@ function coalesce() {
   return Object.values(arguments).filter(x => x !== null && x !== undefined)[0]
 }
 
-function pinOn(pin) {
+async function pinOn(pin) {
   return noPi ? Promise.resolve() : pi.on(pin);
 }
 
-function pinOff(pin) {
+async function pinOff(pin) {
   return noPi ? Promise.resolve() : pi.off(pin);
 }
 
 // Sleep (non-blocking) for the specified duration.
-function sleep(duration) {
+async function sleep(duration) {
   return new Promise(resolve => setTimeout(resolve, duration));
 }
 
@@ -51,7 +51,7 @@ function burnRemaining() {
   );
 }
 
-function relayOn() {
+async function relayOn() {
   return new Promise(async resolve => {
     if (burning) {
       console.log('Ignition already active.');
@@ -82,7 +82,7 @@ function relayOn() {
   })
 }
 
-function relayOff() {
+async function relayOff() {
   return new Promise(async resolve => {
     if (burning) {
       console.log('Deactivating ignition.');
@@ -113,7 +113,7 @@ function relayOff() {
   })
 }
 
-function relayStatus() {
+async function relayStatus() {
   return new Promise(resolve => {
     if (burning) {
       console.log(`Ignition is active, remaining duration is ${burnRemaining()}.`);
@@ -146,7 +146,7 @@ function relayStatus() {
   });
 }
 
-function relayCountDown() {
+async function relayCountDown() {
   return new Promise(async resolve => {
     if (burning) {
       console.log(`Ignition active, ${burnRemaining()} remaining.`);
@@ -204,7 +204,7 @@ function relayCountDown() {
   });
 }
 
-function relayCancelCountDown() {
+async function relayCancelCountDown() {
   return new Promise(resolve => {
     if (burning) {
       console.log(`Burn active, ${burnRemaining()} remaining.`);
@@ -237,7 +237,7 @@ function relayCancelCountDown() {
 }
 
 let config;
-function getConfig() {
+async function getConfig() {
   if (!config) {
     config = new Promise((resolve, reject) => {
       fs.readFile(configPath, (error, raw) => {
