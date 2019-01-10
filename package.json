@@ -3,6 +3,8 @@
   "version": "1.0.0",
   "description": "Model rocket launch control software for Raspberry Pi",
   "scripts": {
+    "lint": "standard",
+    "lint:fix": "standard --fix",
     "server:control": "PI_ROCKET_BIND_PORT=8080 node control-server.js",
     "server:pi": "PI_ROCKET_BIND_PORT=9080 node server.js",
     "server:nopi": "PI_ROCKET_BIND_PORT=9080 PI_ROCKET_NO_PI=true node server.js"
@@ -33,5 +35,8 @@
     "pubnub": "^4.21.6",
     "rpi-gpio": "^0.7.0",
     "yargs": "^11.1.0"
+  },
+  "devDependencies": {
+    "standard": "^12.0.1"
   }
 }

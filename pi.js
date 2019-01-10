@@ -1,6 +1,5 @@
-const _ = require('lodash');
-const P = require('bluebird');
-const gpio = require('rpi-gpio');
+const P = require('bluebird')
+const gpio = require('rpi-gpio')
 
 /* List of pins
 
@@ -27,106 +26,106 @@ GND              39 -- 40  GPIO 21 / SCLK
 
 */
 
-const ON = true;
-const OFF = false;
+const ON = true
+const OFF = false
 
-const EDGE_NONE = gpio.EDGE_NONE;
-const EDGE_FALL = gpio.EDGE_FALLING;
-const EDGE_RISE = gpio.EDGE_RISING;
+const EDGE_NONE = gpio.EDGE_NONE
+const EDGE_FALL = gpio.EDGE_FALLING
+// const EDGE_RISE = gpio.EDGE_RISING
 
-const READ_EDGE = EDGE_FALL;
-const WRITE_EDGE = EDGE_NONE;
+const READ_EDGE = EDGE_FALL
+const WRITE_EDGE = EDGE_NONE
 
-const GPIO_READ = gpio.DIR_IN;
-const GPIO_WRITE = gpio.DIR_OUT;
+const GPIO_READ = gpio.DIR_IN
+const GPIO_WRITE = gpio.DIR_OUT
 
-const pinMap = {};
+const pinMap = {}
 
 // Setup the GPIO pin.
-function setup(pin, ioDirection, edge) {
+function setup (pin, ioDirection, edge) {
   return new P((resolve, reject) => {
     gpio.setup(pin, ioDirection, edge, (error) => {
       if (error) {
-        console.error(`Error setting pin ${pin} to direction ${ioDirection}:`, error);
-        reject(error);
+        console.error(`Error setting pin ${pin} to direction ${ioDirection}:`, error)
+        reject(error)
       } else {
-        console.log(`Set pin ${pin} to direction ${ioDirection}:`);
-        resolve();
+        console.log(`Set pin ${pin} to direction ${ioDirection}:`)
+        resolve()
       }
-    });
-  });
+    })
+  })
 }
 
 // Read from the specified GPIO pin.
-function read(pin) {
-  return P.promisify(gpio.read)(pin);
+function read (pin) {
+  return P.promisify(gpio.read)(pin)
 }
 
 // Write to the specified GPIO pin.
-function write(pin, direction) {
-  return P.promisify(gpio.write)(pin, direction);
+function write (pin, direction) {
+  return P.promisify(gpio.write)(pin, direction)
 }
 
 // Get the current value of the specified GPIO pin.
-function get(pin) {
-  if (pinMap[pin] !== "read") {
+function get (pin) {
+  if (pinMap[pin] !== 'read') {
     return setup(pin, GPIO_READ, READ_EDGE)
-    .then(() => {
-      pinMap[pin] = "read";
-      return read(pin);
-    });
+      .then(() => {
+        pinMap[pin] = 'read'
+        return read(pin)
+      })
   } else {
-    return read(pin);
+    return read(pin)
   }
 }
 
 // Set the current value of the specified GPIO pin.
-function set(pin, direction) {
-  if (pinMap[pin] !== "write") {
+function set (pin, direction) {
+  if (pinMap[pin] !== 'write') {
     return setup(pin, GPIO_WRITE, WRITE_EDGE)
-    .then(() => {
-      pinMap[pin] = "write";
-      return write(pin, direction)
-    });
+      .then(() => {
+        pinMap[pin] = 'write'
+        return write(pin, direction)
+      })
   } else {
-    return write(pin, direction);
+    return write(pin, direction)
   }
 }
 
 // Set a GPIO pin to ON voltage.
-function on(pin) {
-  return set(pin, ON);
+function on (pin) {
+  return set(pin, ON)
 }
 
 // Set a GPIO pin to OFF voltage.
-function off(pin) {
-  return set(pin, OFF);
+function off (pin) {
+  return set(pin, OFF)
 }
 
 // Pulse the pin to ON voltage for duration.
-function pulse(pin, duration) {
+function pulse (pin, duration) {
   return new P((resolve, reject) => {
     on(pin)
-    .then(() => {
-      setTimeout(() => {
-        off(pin)
-        .then(() => resolve())
-        .catch((error) => reject(error));
-      }, duration);
-    })
-    .catch((error) => reject(error));
-  });
+      .then(() => {
+        setTimeout(() => {
+          off(pin)
+            .then(() => resolve())
+            .catch((error) => reject(error))
+        }, duration)
+      })
+      .catch((error) => reject(error))
+  })
 }
 
 // Shutdown the GPIO lib.
-function shutdown() {
-  return new P(resolve => gpio.destroy(() => resolve()));
+function shutdown () {
+  return new P(resolve => gpio.destroy(() => resolve()))
 }
 
-function listen(listener) {
-  gpio.on('change', function(channel, value) {
-    listener(channel, value);
-  });
+function listen (listener) {
+  gpio.on('change', function (channel, value) {
+    listener(channel, value)
+  })
 }
 
 module.exports = {
@@ -135,6 +134,5 @@ module.exports = {
   off: off,
   on: on,
   pulse: pulse,
-  shutdown: shutdown,
-};
-
+  shutdown: shutdown
+}
