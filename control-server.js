@@ -59,6 +59,8 @@ function runServer ({ pubKey, subKey }) {
     message: messageHandler
   })
 
+  let statusRequests = []
+
   function messageHandler (msg) {
     const { channel, message } = msg
 
@@ -70,6 +72,9 @@ function runServer ({ pubKey, subKey }) {
       case 'pi-rocket-notifications':
         // Echo all control commands back to the controller.
         console.log(`Received a notification message: ${message}`)
+        requests = statusRequests
+        statusRequests = []
+        requests.forEach(r => r.resolve(message))
         break
     }
   }
@@ -116,7 +121,7 @@ function runServer ({ pubKey, subKey }) {
     }
   })
 
-  // Check relay status
+  // Prompt delivery of relay status
   app.post('/status', async (req, res) => {
     try {
       await publish('pi-rocket-control', 'status')
@@ -125,6 +130,16 @@ function runServer ({ pubKey, subKey }) {
       console.error('Error fetching relay status:', error)
       res.status(500).json({ code: 500 })
     }
+  })
+
+  // Fetch latest relay status
+  app.get('/status', async (req, res) => {
+    publish('pi-rocket-control', 'status')
+    const status = await new Promise(resolve => {
+      statusRequests.push({ resolve })
+      setTimeout(() => resolve('timeout'), 5000)
+    })
+    res.status(200).json({ code: 200, status })
   })
 
   // Initiate count-down
