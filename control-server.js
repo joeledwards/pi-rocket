@@ -51,10 +51,18 @@ function runServer ({ pubKey, subKey }) {
 
   pubnub.addListener({
     status: event => {
-      if (event.error) { console.error('PubNub status error:', event) } else { console.log('PubNub status event:', event) }
+      if (event.error) {
+        console.error('PubNub status error:', event)
+      } else {
+        console.log('PubNub status event:', event)
+      }
     },
     presence: event => {
-      if (event.error) { console.log('PubNub presence error:', event) } else { console.log('PubNub presence event:', event) }
+      if (event.error) {
+        console.log('PubNub presence error:', event)
+      } else {
+        console.log('PubNub presence event:', event)
+      }
     },
     message: messageHandler
   })
